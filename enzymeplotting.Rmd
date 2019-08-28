@@ -1,0 +1,183 @@
+---
+title: "Plotting Enzymatic Data"
+author: "Brady Johnston"
+date: "27/08/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+if (!require('ggplot2', character.only=T, quietly=T)) {
+  install.packages('ggplot2')
+  library('ggplot2', character.only=T)
+}
+if (!require('reshape2', character.only=T, quietly=T)) {
+  install.packages('reshape2')
+  library('reshape2', character.only=T)
+}
+if (!require('ggthemes', character.only=T, quietly=T)) {
+  install.packages('ggthemes')
+  library('ggthemes', character.only=T)
+}
+if (!require('ggpubr', character.only=T, quietly=T)) {
+  install.packages('ggpubr')
+  library('ggpubr', character.only=T)
+}
+if (!require('egg', character.only=T, quietly=T)) {
+  install.packages('egg')
+  library('egg', character.only=T)
+}
+```
+
+## Plotting enzyme data.
+
+In this example we're going to be plotting data from multiple enzyme experiments and using some `facet_wrap()` functions to arrange it all nicely. 
+
+```{r read data}
+enzdata <- read.csv("./enzyme.csv") 
+enzdata
+```
+
+## Melt Data
+
+To make it easier to work with, we need to melt the data into a more workable format. 
+
+```{r melt}
+melt.enz <- melt(enzdata, id.vars = c("Sub"))
+head(melt.enz)
+```
+
+## Start plotting
+Here is the fun part where we can start plotting. 
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value)) + geom_point()
+
+plt
+```
+
+We can colour-code by adding in `colour=variable` into our `aes()` 
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value, colour=variable)) + geom_point()
+
+plt
+```
+
+Time to add some `x` and `y` labels, a title, and make the plot square.
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value, colour=variable)) +
+  geom_point() +
+  labs(title = "Enzyme Plots") + 
+  theme_base() +
+  theme(aspect.ratio = 1/1) + labs(tag="A") +
+  xlab("[Substrate] nM") + ylab("Velocity µM/min")
+
+plt
+```
+
+A good way to represent multiple experiments is by having side-by side data. We can do that with the `facet_wrap()` and telling it to separate based on variable. 
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value, colour=variable)) +
+  geom_point() + facet_wrap(~variable) + 
+  labs(title = "Enzyme Plots") + 
+  theme_base() +
+  theme(aspect.ratio = 1/1) + 
+  xlab("[Substrate] nM") + ylab("Velocity µM/min")
+
+plt
+```
+
+We don't need the legend anymore, so we can give `legend.position` a `null` variabel that will tell it to not render. 
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value, colour=variable)) +
+  geom_point() + facet_wrap(~variable) +
+  labs(title = "Enzyme Plots") + 
+  theme_base() +
+  theme(aspect.ratio = 1/1, legend.position = "") + 
+  xlab("[Substrate] nM") + ylab("Velocity µM/min")
+
+plt
+```
+
+If your figure is destined for a journal or something similar where you will letter the individual plots, you can re-label with with `tag_facet(~variable)`
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value, colour=variable)) +
+  geom_point() + facet_wrap(~variable) +
+  labs(title = "Enzyme Plots") + 
+  theme_base() +
+  theme(aspect.ratio = 1/1, legend.position = "") + 
+  xlab("[Substrate] nM") + ylab("Velocity µM/min")
+
+tag_facet(plt)
+```
+
+I like to have the data in the background so that each plot can be compared to it. To do so, we'll create a `geom_point()` but with `null` information for what it is being faceted on.
+
+To do that we'll use `geom_point(data = transform(melt.enz, variable = NULL), colour = "grey95")` before the `geom_point()` so that the coloured dots are plotted after, and thus _on top of_ the grey dots. 
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value, colour=variable)) + 
+  geom_point(data = transform(melt.enz, variable = NULL), colour = "grey90") +
+  geom_point() + facet_wrap(~variable) +
+  labs(title = "Enzyme Plots") + 
+  theme_base() +
+  theme(aspect.ratio = 1/1, legend.position = "") + 
+  xlab("[Substrate] nM") + ylab("Velocity µM/min")
+
+tag_facet(plt)
+```
+
+
+Finally, to add a line to these graphs we can use a function using the Michaelis-Menton equation for plotting the velocity. 
+
+### Michaelis-Menton Function
+```
+enzfit <- function(num) {
+  geom_smooth(method = "nls", 
+              method.args = list(formula = y ~ Vmax * x / (Km + x), 
+                                 start = list(Vmax = 50, Km = 0.2)),
+              se = F, size = 0.5, 
+              data = subset(melt.enz, variable==paste("Exp.", num, sep = "")), colour = "black")
+}
+```
+
+### Adding the line to each of the 6 plots.
+
+```
+plt + enzfit(1)
+head(melt.enz)
+for(i in 1:6) {
+  assign("plt", plt + enzfit(i), envir = .GlobalEnv)
+}
+```
+### Final code to generate plots from the data.
+
+```{r}
+plt <- ggplot(melt.enz, aes(Sub, value, colour=variable)) + 
+  geom_point(data = transform(melt.enz, variable = NULL), colour = "grey90") +
+  geom_point() + facet_wrap(~variable) +
+  labs(title = "Enzyme Plots") + 
+  theme_base() +
+  theme(aspect.ratio = 1/1, legend.position = "") + 
+  xlab("[Substrate] nM") + ylab("Velocity µM/min")
+
+enzfit <- function(num) {
+  geom_smooth(method = "nls", 
+              method.args = list(formula = y ~ Vmax * x / (Km + x), 
+                                 start = list(Vmax = 50, Km = 0.2)),
+              se = F, size = 0.5, 
+              data = subset(melt.enz, variable==paste("Exp.", num, sep = "")))
+}
+
+for(i in 1:6) {
+  assign("plt", plt + enzfit(i), envir = .GlobalEnv)
+}
+
+tag_facet(plt)
+```
