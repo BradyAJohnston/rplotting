@@ -70,4 +70,4 @@ for(i in 1:6) {
 plt
 final <- tag_facet(plt, open = "", close = "", tag_pool = c("A", "B", "C", "D", "E", "F"))
 final
-ggsave("tesfile.svg", final, width = 7, height = 5)
+#ggsave("tesfile.svg", final, width = 7, height = 5)
